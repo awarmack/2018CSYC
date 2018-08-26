@@ -9,6 +9,34 @@ suppressPackageStartupMessages(library(leaflet))
 
 
 knitr::opts_chunk$set(echo = TRUE)
+
+#library
+library(tidyverse)
+library(dplyr)
+library(zoo)
+
+dat_folder <- "../data"
+
+dat_files <- list.files(dat_folder, full.names = TRUE)
+
+exp <- lapply(dat_files, read.csv, stringsAsFactors=FALSE)
+exp_raw <- do.call(rbind, exp)
+
+#remove any columns where the data is entirely NA
+allna <- which(apply(exp_raw, 2, function(x) all(is.na(x))))   #Find columns where all is not NA
+
+exp <- exp_raw %>% select(-allna)
+
+#Convert Time
+exp$time <- as.POSIXct((exp$Utc) * (60*60*24), origin = "1899-12-30", tz = "America/Detroit")
+
+#Select only needed columns
+exp <- exp %>% select(time, Bsp, Awa, Aws, Twa, Tws, Twd, Hdg, PDOP, GeoSep, Lat, Lon, Cog, Sog, GPS.time, Twd.90, Mk.Lat, Mk.Lon, Stbd.lat, Stbd.lon)
+
+#change names to lowercase for easier handling
+names(exp) <- tolower(names(exp))
+
+
 ```
 
 
@@ -18,9 +46,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ##My First Leaflet publish...
 ```{r}
 
+
 m <- leaflet() %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
-  addMarkers(lng=174.768, lat=-36.852, popup="The birthplace of R")
+  addPolylines(lng=exp$lon, lat=exp$lat)
 m  # Print the map
 ```
 
