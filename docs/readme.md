@@ -1,5 +1,0 @@
-githubpage
-================
-
-GitHub Documents
-----------------

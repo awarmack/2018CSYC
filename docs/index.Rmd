@@ -46,10 +46,14 @@ names(exp) <- tolower(names(exp))
 ##My First Leaflet publish...
 ```{r}
 
-
 m <- leaflet() %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
-  addPolylines(lng=exp$lon, lat=exp$lat)
+  addPolylines(lng=exp$lon, lat=exp$lat) %>% 
+  addPopups()
 m  # Print the map
 ```
+
+
+
+
 
