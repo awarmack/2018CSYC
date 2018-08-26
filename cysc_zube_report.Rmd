@@ -6,6 +6,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+rm(list = ls()) # clear all environment variables
+suppressPackageStartupMessages(library(leaflet))
+
+
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -15,7 +19,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ##My First Leaflet publish...
 ```{r}
-library(leaflet)
 
 m <- leaflet() %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
