@@ -9,9 +9,9 @@ suppressPackageStartupMessages(library(leaflet))
 
 
 knitr::opts_chunk$set(
+	echo = FALSE,
 	message = FALSE,
 	warning = FALSE,
-	include = FALSE,
 	messages = FALSE
 )
 #library
@@ -95,9 +95,11 @@ For some reason, the appaprent wind angle [AWA] and apparent wind speed [AWS] st
 ggplot(exp) + 
   geom_path(aes(x=time, y=awa)) +
   scale_y_continuous(name="Degree from bow")+
-  ggtitle("Apparent Wind Angle") 
+  ggtitle("Apparent Wind Angle")+
+  geom_vline(xintercept=as.POSIXct("2018-08-25 13:49:00 EDT"), color="red")
 
 ```
+
 
 Apparent Wind Speed also stopped logging after some time. 
 ```{r}
@@ -105,7 +107,8 @@ Apparent Wind Speed also stopped logging after some time.
 ggplot(exp) + 
   geom_path(aes(x=time, y=aws)) +
   scale_y_continuous(name="KTS")+
-  ggtitle("Apparent Wind Speed")
+  ggtitle("Apparent Wind Speed")+
+  geom_vline(xintercept=as.POSIXct("2018-08-25 13:49:00 EDT"))
 
 ```
 
@@ -126,11 +129,28 @@ ggplot(exp) +
 
 ```
 
+
+##Speed over ground seems ok
+
 ```{r}
 ggplot(exp) + 
   geom_path(aes(x=time, y=sog)) +
   scale_y_continuous(name="KTS") + 
   ggtitle("Speed over Ground")
+
+```
+
+##Area where we collected good data
+
+```{r}
+
+gooddata <-   exp[exp$time < as.POSIXct("2018-08-25 13:49:00 EDT"), ]
+
+m + 
+  geom_path(data=exp, aes(x=lon, y=lat), color="gray", size=2) + 
+  geom_point(data=gooddata, aes(x=lon, y=lat), color="blue")+
+  geom_point(data=marks, aes(x=mk.lon, y=mk.lat), shape=17, size=3, color="orange") + 
+  scale_color_viridis_c()
 
 ```
 
