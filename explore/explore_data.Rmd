@@ -47,14 +47,23 @@ ggplot(exp) + geom_path(aes(x=lon, y=lat), color="blue") + geom_point(aes(x=mk.l
 
 ```
 
-
+, label = ~htmlEscape(time)
 ```{r}
 library(leaflet)
+library(htmltools)
 
-m <- leaflet() %>%
+timeformatted <- format(exp$time, "%R")
+
+exp_l <- exp[exp$time > as.POSIXct("2018-08-25 12:55:00 EDT"), ]
+
+pal <- colorNumeric(
+  palette = "Blues",
+  domain = exp_l$sog)
+
+leaflet(exp_l) %>%
   addTiles() %>%  # Add default OpenStreetMap map tiles
-  addPolylines(lng=exp$lon, lat=exp$lat)
-m  # Print the map
+  addPolylines(lng=~lon, lat= ~lat, label = ~htmlEscape(sog), color= ~ pal(sog))
+  
 
 ```
 

@@ -1,5 +1,5 @@
 ---
-title: "index"
+title: "2018 Crescent Sail Yacht Club Regatta"
 output: html_document
 ---
 
@@ -8,19 +8,18 @@ rm(list = ls()) # clear all environment variables
 suppressPackageStartupMessages(library(leaflet))
 
 
-knitr::opts_chunk$set(echo = TRUE)
-
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	include = FALSE,
+	messages = FALSE
+)
 #library
 library(tidyverse)
 library(dplyr)
 library(zoo)
 
-dat_folder <- "../data"
-
-dat_files <- list.files(dat_folder, full.names = TRUE)
-
-exp <- lapply(dat_files, read.csv, stringsAsFactors=FALSE)
-exp_raw <- do.call(rbind, exp)
+exp_raw <- read.csv("../data/2018Aug25.csv", stringsAsFactors = FALSE)
 
 #remove any columns where the data is entirely NA
 allna <- which(apply(exp_raw, 2, function(x) all(is.na(x))))   #Find columns where all is not NA
@@ -36,24 +35,162 @@ exp <- exp %>% select(time, Bsp, Awa, Aws, Twa, Tws, Twd, Hdg, PDOP, GeoSep, Lat
 #change names to lowercase for easier handling
 names(exp) <- tolower(names(exp))
 
+marks <- unique(exp[, c("mk.lon", "mk.lat")])
+marks <- na.omit(marks)
+
+#limit the data
+exp <- exp[exp$time > as.POSIXct("2018-08-25 12:55:00 EDT"), ]
+
+
+#Lets fill in some missing data
+exp$sog <- na.approx(exp$sog, x=exp$time, na.rm = FALSE)
+exp$lon <- na.approx(exp$lon, x=exp$time, na.rm = FALSE)
+exp$lat <- na.approx(exp$lat, x=exp$time, na.rm = FALSE)
+exp$twa <- na.approx(exp$twa, x=exp$time, na.rm = FALSE)
+exp$tws <- na.approx(exp$tws, x=exp$time, na.rm = FALSE)
+
 
 ```
 
 
-#Crescent Sail Yacht Club 2018 Regatta
 
 
-##My First Leaflet publish...
+#Course Sailed
+```{r message=FALSE, warning=FALSE}
+#get states shape files
+mi <- map_data("state") %>% filter(region=="michigan")
+
+
+
+#plot the positions
+m <- ggplot()+
+  geom_polygon(data=mi, aes(long, lat, group=group)) + 
+  coord_map("mercator", xlim=c(-82.9, -82.77), ylim=c(42.38, 42.475))
+
+
+
+m + 
+  geom_path(data=exp, aes(x=lon, y=lat, color=sog), size=2) + 
+  geom_point(data=marks, aes(x=mk.lon, y=mk.lat), shape=17, size=3, color="orange") + 
+  scale_color_viridis_c()
+
+```
+
+The tacks are supprisingly parallel. It seems the wind direction was relatively stable until later in the beat. 
+
 ```{r}
 
-m <- leaflet() %>%
-  addTiles() %>%  # Add default OpenStreetMap map tiles
-  addPolylines(lng=exp$lon, lat=exp$lat) %>% 
-  addPopups()
-m  # Print the map
+ggplot(exp) + 
+  geom_path(aes(x=time, y=cog)) +
+  scale_y_continuous(name="Bearing [Deg]")+
+  ggtitle("Course Over Ground")
+
+```
+
+#Apparent Wind Angle
+For some reason, the appaprent wind angle [AWA] and apparent wind speed [AWS] stopped logging around 1:50PM. Unfortunately, this means many of the values calculated from AWA and AWS can't be used past this time. This includes the true wind and polar targets. 
+
+```{r}
+
+ggplot(exp) + 
+  geom_path(aes(x=time, y=awa)) +
+  scale_y_continuous(name="Degree from bow")+
+  ggtitle("Apparent Wind Angle") 
+
+```
+
+Apparent Wind Speed also stopped logging after some time. 
+```{r}
+
+ggplot(exp) + 
+  geom_path(aes(x=time, y=aws)) +
+  scale_y_continuous(name="KTS")+
+  ggtitle("Apparent Wind Speed")
+
+```
+
+
+```{r}
+ggplot(exp) + 
+  geom_path(aes(x=time, y=twa)) +
+  scale_y_continuous(name="Degree from bow") + 
+  ggtitle("True Wind Angle")
+
+```
+
+```{r}
+ggplot(exp) + 
+  geom_path(aes(x=time, y=tws)) +
+  scale_y_continuous(name="Degree from bow") + 
+  ggtitle("True Wind Angle")
+
+```
+
+```{r}
+ggplot(exp) + 
+  geom_path(aes(x=time, y=sog)) +
+  scale_y_continuous(name="KTS") + 
+  ggtitle("Speed over Ground")
+
 ```
 
 
 
+
+
+
+#Performance to Polar
+```{r}
+library(akima)
+
+source("../src/optimalPerformanceFunctions.R")
+load("../data/polarmodel.rda")
+
+exp_opt <- exp[!is.na(exp$twa) & !is.na(exp$tws), ]
+
+exp_opt$opt_v <- getOptV(btw = exp_opt$twa, vtw = exp_opt$tws, pol.model = pol.model)
+
+exp_opt <- exp_opt[exp_opt$opt_v > 0, ]
+
+exp_opt$opt_v_roll <- rollmean(exp_opt$opt_v, k = 10, fill = NA)
+
+exp_opt$pol_perc <- (exp_opt$sog / exp_opt$opt_v_roll) * 100
+
+ggplot(exp_opt) + 
+  geom_path(aes(x=time, y=pol_perc, color=tws)) + 
+  scale_color_viridis_c(name="True Wind Speed") +
+  scale_x_datetime()+
+  geom_vline(xintercept=as.POSIXct("2018-08-25 13:49:33"), color="red")+
+  geom_hline(yintercept=100)
+
+```
+
+Only looking at the data where we have AWA. 
+```{r}
+
+good <- exp_opt[exp_opt$time < as.POSIXct("2018-08-25 13:49:33"), ]
+
+poldata <- as.data.frame(pol.model$pol.matrix)
+names(poldata) <- pol.model$tws
+poldata <- gather(poldata, key = "tws", value="target")
+poldata$twa <- pol.model$twa
+
+
+ggplot(good[good$tws > 15.5 & good$tws < 16.5, ]) + 
+  geom_point(aes(x=abs(twa), y=sog, color=pol_perc))+ 
+  geom_path(data=poldata[poldata$tws==16, ], aes(x=twa, y=target, group=tws))+
+  coord_polar() + 
+  scale_x_continuous(limits=c(0,360))+
+  ggtitle("TWS = 16 kts")
+
+ggplot(good[good$tws > 19.5 & good$tws < 20.5, ]) + 
+  geom_point(aes(x=abs(twa), y=sog, color=pol_perc), alpha=0.3)+ 
+  geom_path(data=poldata[poldata$tws==16, ], aes(x=twa, y=target, group=tws))+
+  coord_polar() + 
+  scale_x_continuous(limits=c(0,360))+
+  ggtitle("TWS = 20 kts")
+
+
+```
 
 
